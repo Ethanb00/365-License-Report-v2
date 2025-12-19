@@ -79,6 +79,7 @@ if (Test-Path $PricingCsvPath) {
   }
 }
 
+
 # Filter licensed and unlicensed users
 $licensed = $assigned | Where-Object { $_.AssignedFriendlyNames -and $_.AssignedFriendlyNames -ne 'None' }
 $unlicensed = $assigned | Where-Object { -not $_.AssignedFriendlyNames -or $_.AssignedFriendlyNames -eq 'None' }
@@ -113,11 +114,16 @@ foreach ($rw in $renewals) {
   $skuIdVal = if ($rw.PSObject.Properties.Name -contains 'SkuId') { $rw.SkuId } elseif ($rw.PSObject.Properties.Name -contains 'Sku_Id') { $rw.Sku_Id } else { $rw.SkuId }
 
   $renewalsParsed += [PSCustomObject]@{
-    SkuId         = $skuIdVal
-    SkuPartNumber = $skuPart
-    RenewalDate   = $rawDate
-    ParsedDate    = $parsed
-    Notes         = $notes
+    SkuId                  = $skuIdVal
+    SkuPartNumber          = $skuPart
+    RenewalDate            = $rawDate
+    ParsedDate             = $parsed
+    Notes                  = $notes
+    CommerceSubscriptionId = if ($rw.PSObject.Properties.Name -contains 'CommerceSubscriptionId') { $rw.CommerceSubscriptionId } else { '' }
+    SubscriptionId         = if ($rw.PSObject.Properties.Name -contains 'SubscriptionId') { $rw.SubscriptionId } else { '' }
+    IsTrial                = if ($rw.PSObject.Properties.Name -contains 'IsTrial') { $rw.IsTrial } else { '' }
+    SubscriptionStatus     = if ($rw.PSObject.Properties.Name -contains 'SubscriptionStatus') { $rw.SubscriptionStatus } else { '' }
+    TotalLicenses          = if ($rw.PSObject.Properties.Name -contains 'TotalLicenses') { $rw.TotalLicenses } else { '' }
   }
 }
 
@@ -392,7 +398,7 @@ $renewalsHtml = ""
 if ($renewalsParsed.Count -gt 0) {
   # Add a search box and make the table identifiable for client-side scripting
   $renewalsHtml += '<div style="margin-bottom:8px"><input type="search" id="renewalsSearch" data-target="renewalsTable" class="table-search" placeholder="Search renewals..." /></div>'
-  $renewalsHtml += '<table id="renewalsTable" class="sortable searchable"><thead><tr><th>License Name</th><th>Renewal Date</th><th>Days Until Renewal</th></tr></thead><tbody>' + "`n"
+  $renewalsHtml += '<table id="renewalsTable" class="sortable searchable"><thead><tr><th>License Name</th><th>Commerce Sub ID</th><th>Trial/Paid</th><th>Status</th><th>Total Licenses</th><th>Renewal Date</th><th>Days Until Renewal</th></tr></thead><tbody>' + "`n"
   foreach ($rw in ($renewalsParsed | Sort-Object ParsedDate)) {
     $daysUntil = ''
     if ($rw.ParsedDate) { $daysUntil = ([int]([math]::Floor(($rw.ParsedDate - $today).TotalDays))) }
@@ -406,7 +412,7 @@ if ($renewalsParsed.Count -gt 0) {
       $isPaid = $true
     }
 
-    $rowHtml = "<tr><td>$(To-HtmlSafe $rw.FriendlyName)</td><td>$(To-HtmlSafe $dateDisplay)</td><td>$(To-HtmlSafe $daysDisplay)</td></tr>`n"
+    $rowHtml = "<tr><td>$(To-HtmlSafe $rw.FriendlyName)</td><td>$(To-HtmlSafe $rw.CommerceSubscriptionId)</td><td>$(To-HtmlSafe $rw.IsTrial)</td><td>$(To-HtmlSafe $rw.SubscriptionStatus)</td><td>$(To-HtmlSafe $rw.TotalLicenses)</td><td>$(To-HtmlSafe $dateDisplay)</td><td>$(To-HtmlSafe $daysDisplay)</td></tr>`n"
     if ($isPaid) {
       $renewalsHtml += $rowHtml
     }
@@ -418,7 +424,7 @@ if ($renewalsParsed.Count -gt 0) {
   
   if ($freeRenewalsHtml) {
     $renewalsHtml += '<details style="margin-top:16px"><summary><h4 style="margin:6px 0; display:inline">Free / Zero-Cost Renewals</h4></summary>'
-    $renewalsHtml += '<table id="renewalsFreeTable" class="sortable"><thead><tr><th>License Name</th><th>Renewal Date</th><th>Days Until Renewal</th></tr></thead><tbody>' + "`n"
+    $renewalsHtml += '<table id="renewalsFreeTable" class="sortable"><thead><tr><th>License Name</th><th>Commerce Sub ID</th><th>Trial/Paid</th><th>Status</th><th>Total Licenses</th><th>Renewal Date</th><th>Days Until Renewal</th></tr></thead><tbody>' + "`n"
     $renewalsHtml += $freeRenewalsHtml
     $renewalsHtml += '</tbody></table></details>'
   }
@@ -468,7 +474,10 @@ if ($assigned -and $assigned.Count -gt 0) {
       elseif ($a.AccountStatus -eq 'Enabled' -and $userCost -gt 0) {
         # Check inactivity > 30 days
         $lastSi = $a.LastSignInDate
-        if ([string]::IsNullOrWhiteSpace($lastSi) -or $lastSi -eq 'N/A') {
+        if ($lastSi -eq 'Unknown') {
+          # Do nothing, we don't know the status due to permissions
+        }
+        elseif ([string]::IsNullOrWhiteSpace($lastSi) -or $lastSi -eq 'N/A') {
           # Never signed in, check created date
           if ($a.AccountCreatedTime -as [DateTime]) {
             $created = [DateTime]$a.AccountCreatedTime

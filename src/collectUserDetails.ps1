@@ -26,12 +26,22 @@ $PropertiesToRetrieve = @(
     'SignInActivity' # Required to get LastSignInDateTime
 )
 
-$AllUsers = Get-MgUser -All -Property $PropertiesToRetrieve
-
-
 # --- 2. Collect Data (Requires Microsoft Graph PowerShell Module) ---
 try {
     Write-Host "Querying all tenant users..."
+    
+    $AllUsers = @()
+    $signInDataAvailable = $true
+    try {
+        $AllUsers = Get-MgUser -All -Property $PropertiesToRetrieve -ErrorAction Stop
+    }
+    catch {
+        Write-Host "Warning: Retrying user query without sign-in activity (requires AuditLog.Read.All permission)..." -ForegroundColor Yellow
+        $signInDataAvailable = $false
+        $PropertiesToRetrieveFallback = $PropertiesToRetrieve | Where-Object { $_ -ne 'SignInActivity' }
+        $AllUsers = Get-MgUser -All -Property $PropertiesToRetrieveFallback
+    }
+
     # Replace Get-MgUser with your actual Microsoft Graph cmdlet if needed (e.g., Get-AzureADUser)
     # --- Build SKU mapping (from subscribed SKUs and local data/skus.csv) ---
     $skuIdToPart = @{}
@@ -105,7 +115,13 @@ try {
         $assignmentDetails = if ($detailStrings -and $detailStrings.Count -gt 0) { $detailStrings -join ';' } else { 'None' }
 
         # 4. Last Sign In
-        $lastSignIn = if ($u.SignInActivity -and $u.SignInActivity.LastSignInDateTime) { $u.SignInActivity.LastSignInDateTime } else { "N/A" }
+        $lastSignIn = 'N/A'
+        if ($signInDataAvailable) {
+            if ($u.SignInActivity -and $u.SignInActivity.LastSignInDateTime) { $lastSignIn = $u.SignInActivity.LastSignInDateTime }
+        }
+        else {
+            $lastSignIn = 'Unknown'
+        }
 
         # 5. Account Status
         $accountStatus = if ($u.AccountEnabled -eq $true) { "Enabled" } else { "Disabled" }

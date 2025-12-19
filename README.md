@@ -26,6 +26,7 @@ A comprehensive PowerShell-based reporting tool for Microsoft 365 licenses, prov
   - `Directory.Read.All`
   - `SubscribedSku.Read.All`
   - `Reports.Read.All`
+  - `AuditLog.Read.All`
 
 ## Setup
 

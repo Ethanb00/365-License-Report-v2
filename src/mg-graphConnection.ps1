@@ -5,7 +5,7 @@ $mgContext = Get-MgContext
 if ($null -eq $mgContext ) {
     # Connect to Microsoft Graph
     Write-Host "`nMicrosoft Graph connection required."
-    Connect-MgGraph -NoWelcome -Scopes "User.Read.All","Group.Read.All","Directory.Read.All","Reports.Read.All","AuditLog.Read.All", "Organization.Read.All"
+    Connect-MgGraph -NoWelcome -Scopes "User.Read.All", "Group.Read.All", "Directory.Read.All", "Reports.Read.All", "AuditLog.Read.All", "Organization.Read.All"
     Write-Host "`nConnected to Microsoft Graph as: $((Get-MgContext).Account)" 
 }
 # If existing connection, confirm to stay connected or reconnect
@@ -24,7 +24,7 @@ else {
             # Disconnect and reconnect
             Write-Host "`nDisconnecting and reconnecting to Microsoft Graph."
             Disconnect-MgGraph | Out-Null
-            Connect-MgGraph -NoWelcome -Scopes "User.Read.All","Group.Read.All","Directory.Read.All","Reports.Read.All"
+            Connect-MgGraph -NoWelcome -Scopes "User.Read.All", "Group.Read.All", "Directory.Read.All", "Reports.Read.All", "AuditLog.Read.All", "Organization.Read.All"
             Write-Host "`nConnected to Microsoft Graph as: $((Get-MgContext).Account)" -ForegroundColor Green
             break
         }

@@ -24,3 +24,6 @@
 
 # Create HTML Report
 . ".\src\generateHTMLReport.ps1" -GlobalWorkingPath $GlobalWorkingPath
+
+# Create Excel Report
+. ".\src\generateExcelReport.ps1" -GlobalWorkingPath $GlobalWorkingPath

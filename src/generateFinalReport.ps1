@@ -131,11 +131,22 @@ if ($ImportPricing[0].Price) {
 
 # Find tenant accounts - but filtered so that we only fetch those with licenses
 Write-Host "Finding licensed user accounts..."
-[Array]$Users = Get-MgUser -Filter "assignedLicenses/`$count ne 0 and userType eq 'Member'"  `
-  -ConsistencyLevel eventual -CountVariable Records -All -PageSize 999 `
-  -Property id, displayName, userPrincipalName, country, department, assignedlicenses, OnPremisesExtensionAttributes, `
-  licenseAssignmentStates, createdDateTime, jobTitle, signInActivity, companyName, accountenabled |  `
-  Sort-Object DisplayName
+$Users = @()
+try {
+  $Users = Get-MgUser -Filter "assignedLicenses/`$count ne 0 and userType eq 'Member'"  `
+    -ConsistencyLevel eventual -CountVariable Records -All -PageSize 999 `
+    -Property id, displayName, userPrincipalName, country, department, assignedlicenses, OnPremisesExtensionAttributes, `
+    licenseAssignmentStates, createdDateTime, jobTitle, signInActivity, companyName, accountenabled -ErrorAction Stop |  `
+    Sort-Object DisplayName
+}
+catch {
+  Write-Host "Warning: Retrying user query without sign-in activity (requires AuditLog.Read.All permission)..." -ForegroundColor Yellow
+  $Users = Get-MgUser -Filter "assignedLicenses/`$count ne 0 and userType eq 'Member'"  `
+    -ConsistencyLevel eventual -CountVariable Records -All -PageSize 999 `
+    -Property id, displayName, userPrincipalName, country, department, assignedlicenses, OnPremisesExtensionAttributes, `
+    licenseAssignmentStates, createdDateTime, jobTitle, companyName, accountenabled -ErrorAction Stop |  `
+    Sort-Object DisplayName
+}
 
 If (!($Users)) { 
   Write-Host "No licensed user accounts found - exiting"; break 

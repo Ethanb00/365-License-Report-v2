@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$GlobalWorkingPath
 )
 
@@ -22,7 +22,8 @@ foreach ($Sku in $Skus) {
 $Uri = "https://graph.microsoft.com/v1.0/directory/subscriptions"
 try {
     [array]$SkuData = Invoke-MgGraphRequest -Uri $Uri -Method Get
-} catch {
+}
+catch {
     Write-Error "Failed to retrieve subscription data from Graph: $_"
     return
 }
@@ -34,10 +35,22 @@ $DuplicateSkus = @()
 foreach ($Sku in $SkuData.Value) {
     if ($SkuHash.ContainsKey($Sku.SkuId)) {
         $DuplicateSkus += $Sku.SkuId
-    } else {
-        $SkuHash[$Sku.SkuId] = $Sku.nextLifecycleDateTime
+    }
+    else {
+        # Extract additional details using actual Graph API property names
+        $isTrial = if ($Sku.isTrial) { "Trial" } else { "Paid" }
+        
+        $SkuHash[$Sku.SkuId] = [PSCustomObject]@{
+            RenewalDate            = $Sku.nextLifecycleDateTime
+            CommerceSubscriptionId = $Sku.commerceSubscriptionId
+            SubscriptionId         = $Sku.id
+            IsTrial                = $isTrial
+            Status                 = $Sku.status
+            TotalLicenses          = $Sku.totalLicenses
+        }
     }
 }
+
 
 if ($DuplicateSkus.Count -gt 0) {
     Write-Warning "Duplicate SkuIds detected in renewal data: $(( $DuplicateSkus | Sort-Object | Get-Unique ) -join ', ')"
@@ -45,17 +58,36 @@ if ($DuplicateSkus.Count -gt 0) {
 
 # Enrich report with renewal info
 foreach ($R in $SkuReport) {
-    $SkuRenewalDate = $SkuHash[$R.SkuId]
-    $R | Add-Member -NotePropertyName "Renewal date" -NotePropertyValue $SkuRenewalDate -Force
+    if ($SkuHash.ContainsKey($R.SkuId)) {
+        $details = $SkuHash[$R.SkuId]
+        $SkuRenewalDate = $details.RenewalDate
+        $R | Add-Member -NotePropertyName "Renewal date" -NotePropertyValue $SkuRenewalDate -Force
+        $R | Add-Member -NotePropertyName "CommerceSubscriptionId" -NotePropertyValue $details.CommerceSubscriptionId -Force
+        $R | Add-Member -NotePropertyName "SubscriptionId" -NotePropertyValue $details.SubscriptionId -Force
+        $R | Add-Member -NotePropertyName "IsTrial" -NotePropertyValue $details.IsTrial -Force
+        $R | Add-Member -NotePropertyName "SubscriptionStatus" -NotePropertyValue $details.Status -Force
+        $R | Add-Member -NotePropertyName "TotalLicenses" -NotePropertyValue $details.TotalLicenses -Force
 
-    if ($SkuRenewalDate) {
-        $DaysToRenew = ($SkuRenewalDate - (Get-Date)).Days
-        $R | Add-Member -NotePropertyName "Days to renewal" -NotePropertyValue $DaysToRenew -Force
+        if ($SkuRenewalDate) {
+            $DaysToRenew = ($SkuRenewalDate - (Get-Date)).Days
+            $R | Add-Member -NotePropertyName "Days to renewal" -NotePropertyValue $DaysToRenew -Force
 
-        $Status = if ($DaysToRenew -lt 0) { "Expired" } elseif ($DaysToRenew -le 30) { "Expiring Soon" } else { "Active" }
-        $R | Add-Member -NotePropertyName "Status" -NotePropertyValue $Status -Force
-    } else {
-        Write-Warning "No renewal date found for SKU: $($R.SkuPartNumber) [$($R.SkuId)]"
+            $Status = if ($DaysToRenew -lt 0) { "Expired" } elseif ($DaysToRenew -le 30) { "Expiring Soon" } else { "Active" }
+            $R | Add-Member -NotePropertyName "Status" -NotePropertyValue $Status -Force
+        }
+        else {
+            $R | Add-Member -NotePropertyName "Days to renewal" -NotePropertyValue "Unknown" -Force
+            $R | Add-Member -NotePropertyName "Status" -NotePropertyValue "Unknown" -Force
+        }
+    }
+    else {
+        Write-Warning "No renewal metadata found for SKU: $($R.SkuPartNumber) [$($R.SkuId)]"
+        $R | Add-Member -NotePropertyName "Renewal date" -NotePropertyValue "Unknown" -Force
+        $R | Add-Member -NotePropertyName "CommerceSubscriptionId" -NotePropertyValue "Unknown" -Force
+        $R | Add-Member -NotePropertyName "SubscriptionId" -NotePropertyValue "Unknown" -Force
+        $R | Add-Member -NotePropertyName "IsTrial" -NotePropertyValue "Unknown" -Force
+        $R | Add-Member -NotePropertyName "SubscriptionStatus" -NotePropertyValue "Unknown" -Force
+        $R | Add-Member -NotePropertyName "TotalLicenses" -NotePropertyValue "Unknown" -Force
         $R | Add-Member -NotePropertyName "Days to renewal" -NotePropertyValue "Unknown" -Force
         $R | Add-Member -NotePropertyName "Status" -NotePropertyValue "Unknown" -Force
     }
@@ -65,7 +97,8 @@ foreach ($R in $SkuReport) {
 $PricingPath = Join-Path $GlobalWorkingPath 'pricing.csv'
 if (-not (Test-Path $PricingPath)) {
     Write-Warning "Pricing reference file not found: $PricingPath"
-} else {
+}
+else {
     $PricingData = Import-Csv -Path $PricingPath
     $PricingLookup = @{}
     foreach ($Item in $PricingData) {
@@ -80,7 +113,8 @@ if (-not (Test-Path $PricingPath)) {
         $DisplayName = $PricingLookup[$R.SkuPartNumber]
         if ($DisplayName) {
             $R | Add-Member -NotePropertyName "DisplayName" -NotePropertyValue $DisplayName -Force
-        } else {
+        }
+        else {
             $UnmatchedSkus += $R.SkuPartNumber
             $R | Add-Member -NotePropertyName "DisplayName" -NotePropertyValue "Unknown" -Force
         }
@@ -95,15 +129,20 @@ if (-not (Test-Path $PricingPath)) {
 # Reorder properties to place DisplayName first
 $OrderedReport = $SkuReport | ForEach-Object {
     [PSCustomObject][Ordered]@{
-        DisplayName     = $_.DisplayName
-        SkuPartNumber   = $_.SkuPartNumber
-        SkuId           = $_.SkuId
-        ActiveUnits     = $_.ActiveUnits
-        WarningUnits    = $_.WarningUnits
-        ConsumedUnits   = $_.ConsumedUnits
-        'Renewal date'  = $_.'Renewal date'
-        'Days to renewal' = $_.'Days to renewal'
-        Status          = $_.Status
+        DisplayName            = $_.DisplayName
+        SkuPartNumber          = $_.SkuPartNumber
+        SkuId                  = $_.SkuId
+        CommerceSubscriptionId = $_.CommerceSubscriptionId
+        SubscriptionId         = $_.SubscriptionId
+        IsTrial                = $_.IsTrial
+        SubscriptionStatus     = $_.SubscriptionStatus
+        TotalLicenses          = $_.TotalLicenses
+        ActiveUnits            = $_.ActiveUnits
+        WarningUnits           = $_.WarningUnits
+        ConsumedUnits          = $_.ConsumedUnits
+        'Renewal date'         = $_.'Renewal date'
+        'Days to renewal'      = $_.'Days to renewal'
+        Status                 = $_.Status
     }
 }
 

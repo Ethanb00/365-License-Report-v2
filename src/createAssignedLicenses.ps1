@@ -50,12 +50,14 @@ if (Test-Path -Path $customSkuCsvPath) {
 }
 
 Write-Host "Querying users (Id/UPN/DisplayName, CreatedDateTime, AccountEnabled, SignInActivity)..." -ForegroundColor Yellow
+$signInDataAvailable = $true
 try {
-    $users = Get-MgUser -All -Property Id, UserPrincipalName, DisplayName, CreatedDateTime, AccountEnabled, SignInActivity, licenseAssignmentStates
+    $users = Get-MgUser -All -Property Id, UserPrincipalName, DisplayName, CreatedDateTime, AccountEnabled, SignInActivity, licenseAssignmentStates -ErrorAction Stop
 }
 catch {
-    Write-Host "Failed to query users via Graph: $_" -ForegroundColor Yellow
-    $users = @()
+    Write-Host "Warning: Retrying user query without sign-in activity (requires AuditLog.Read.All permission)..." -ForegroundColor Yellow
+    $signInDataAvailable = $false
+    $users = Get-MgUser -All -Property Id, UserPrincipalName, DisplayName, CreatedDateTime, AccountEnabled, licenseAssignmentStates
 }
 
 # We'll produce one consolidated row per user. Also build a flat list for the per-SKU summary.
@@ -68,7 +70,12 @@ foreach ($u in $users) {
     $acctCreated = $u.CreatedDateTime
     $acctEnabled = if ($u.AccountEnabled -eq $true) { 'Enabled' } else { 'Disabled' }
     $lastSignIn = 'N/A'
-    try { if ($u.SignInActivity -and $u.SignInActivity.LastSignInDateTime) { $lastSignIn = $u.SignInActivity.LastSignInDateTime } } catch {}
+    if ($signInDataAvailable) {
+        try { if ($u.SignInActivity -and $u.SignInActivity.LastSignInDateTime) { $lastSignIn = $u.SignInActivity.LastSignInDateTime } } catch {}
+    }
+    else {
+        $lastSignIn = 'Unknown'
+    }
 
     try {
         $ld = Get-MgUserLicenseDetail -UserId $uid -ErrorAction SilentlyContinue
