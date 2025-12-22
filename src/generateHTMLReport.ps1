@@ -73,7 +73,7 @@ $unlicensed = $assigned | Where-Object { -not $_.AssignedFriendlyNames -or $_.As
 
 $topSkus = $skus | Sort-Object @{Expression = { [int]($_.ConsumedUnits) }; Descending = $true } | Select-Object -First 10
 
-$generated = (Get-Date).ToString('MMMM dd, yyyy')
+$generated = (Get-Date).ToString('MM/dd/yyyy')
 
 # Process renewal data for summaries and enhanced table
 $today = (Get-Date).Date
@@ -138,8 +138,8 @@ foreach ($r in $renewalsParsed) {
   $r | Add-Member -NotePropertyName FriendlyName -NotePropertyValue $friendly -Force
 }
 
-$renewalsKnownCount = ($renewalsParsed | Where-Object { $_.ParsedDate -ne $null }).Count
-$renewalsUpcoming90 = $renewalsParsed | Where-Object { $_.ParsedDate -ne $null -and $_.ParsedDate -ge $today -and $_.ParsedDate -le $today.AddDays(90) }
+$renewalsKnownCount = ($renewalsParsed | Where-Object { $null -ne $_.ParsedDate }).Count
+$renewalsUpcoming90 = $renewalsParsed | Where-Object { $null -ne $_.ParsedDate -and $_.ParsedDate -ge $today -and $_.ParsedDate -le $today.AddDays(90) }
 
 # Calculate Next Paid Renewal
 $nextPaidRenewalDate = $null
@@ -147,7 +147,7 @@ $nextPaidRenewalName = ''
 $nextPaidRenewalDays = $null
 
 $paidRenewals = $renewalsParsed | Where-Object { 
-  $_.ParsedDate -ne $null -and 
+  $null -ne $_.ParsedDate -and 
   $pricingTable.ContainsKey($_.SkuPartNumber) -and 
   $pricingTable[$_.SkuPartNumber] -gt 0 
 } | Sort-Object ParsedDate
@@ -173,13 +173,13 @@ foreach ($u in $assigned) {
 }
 $totalPaidUsersCount = $paidUsersSet.Count
 $renewalsUpcomingCount = $renewalsUpcoming90.Count
-$nextRenewal = $renewalsParsed | Where-Object { $_.ParsedDate -ne $null -and $_.ParsedDate -ge $today } | Sort-Object ParsedDate | Select-Object -First 1
+$nextRenewal = $renewalsParsed | Where-Object { $null -ne $_.ParsedDate -and $_.ParsedDate -ge $today } | Sort-Object ParsedDate | Select-Object -First 1
 $displayNextRenewal = ''
 if ($nextRenewal) {
   # Find all renewals on the same date (date-only comparison)
   $sameDateList = @()
   if ($renewalsParsed) {
-    $sameDateList = $renewalsParsed | Where-Object { $_.ParsedDate -ne $null -and ([datetime]$_.ParsedDate).Date -eq ([datetime]$nextRenewal.ParsedDate).Date }
+    $sameDateList = $renewalsParsed | Where-Object { $null -ne $_.ParsedDate -and ([datetime]$_.ParsedDate).Date -eq ([datetime]$nextRenewal.ParsedDate).Date }
   }
 
   # If multiple licenses share the next renewal date, show a grouped message
@@ -435,7 +435,6 @@ body {
 
 .overview-card .badge-inline {
   display: inline-block;
-}
   letter-spacing: 0.05em;
 }
 
@@ -605,7 +604,7 @@ function Format-Date($d) {
   if ([string]::IsNullOrWhiteSpace($d)) { return '' }
   try {
     $dt = [datetime]$d
-    return $dt.ToString('MMMM dd, yyyy')
+    return $dt.ToString('MM,dd, yyyy') 
   }
   catch {
     return $d
@@ -713,7 +712,7 @@ if ($renewalsParsed.Count -gt 0) {
     if ($rw.ParsedDate) { $daysUntil = ([int]([math]::Floor(($rw.ParsedDate - $today).TotalDays))) }
     if ($daysUntil -ne '') { $daysDisplay = $daysUntil -lt 0 ? ("Past: $([math]::Abs($daysUntil))d") : ("$daysUntil d") } else { $daysDisplay = '' }
     $dateDisplay = ''
-    if ($rw.ParsedDate) { $dateDisplay = $rw.ParsedDate.ToString('MMMM dd, yyyy') }
+    if ($rw.ParsedDate) { $dateDisplay = $rw.ParsedDate.ToString('MM/dd/yyyy') }
     
     $isPaid = $false
     # Check if SKU is paid
@@ -903,7 +902,7 @@ $html = @"
             <div class="card-label-group">
               <div class="label">Next Paid Renewal</div>
               <div class="badge-inline">
-                $(if ($nextPaidRenewalDays -ne $null) {
+                $(if ($null -ne $nextPaidRenewalDays) {
                     $color = if ($nextPaidRenewalDays -le 30) { 'badge-red' } elseif ($nextPaidRenewalDays -le 90) { 'badge-amber' } else { 'badge-green' }
                     "<span class='badge $color'>In $nextPaidRenewalDays days</span>"
                 } else {
@@ -913,7 +912,7 @@ $html = @"
             </div>
             <div class="icon">🔔</div>
           </div>
-          <div class="value">$(if ($nextPaidRenewalDate) { $nextPaidRenewalDate.ToString('MMMM dd, yyyy') } else { 'N/A' })</div>
+          <div class="value">$(if ($nextPaidRenewalDate) { $nextPaidRenewalDate.ToString('MM/dd/yyyy') } else { 'N/A' })</div>
           <div class="sub-value">Upcoming renewal date</div>
         </div>
 
@@ -961,7 +960,7 @@ $html = @"
             $paidRowsHtml
             </tbody>
             <tfoot>
-              <tr style="font-weight:bold;background:#fafbfc">
+              <tr style="font-weight:bold">
                 <td colspan="5" style="text-align:right">Totals:</td>
                 <td></td>
                 <td></td>
