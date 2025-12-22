@@ -37,22 +37,8 @@ try {
   # Only attempt to fetch logo for domains that are not the default onmicrosoft domain
   $secureApiKey = Get-Secret -Name 'LogoApiKey' -ErrorAction SilentlyContinue
   if ($secureApiKey) {
-    try {
-      $LogoToken = SecureStringToPlain $secureApiKey
-      $candidate = "https://img.logo.dev/$($domain)?token=$($LogoToken)"
-
-      try {
-        $resp = Invoke-WebRequest -Uri $candidate -Method Head -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
-        if ($resp.StatusCode -ge 200 -and $resp.StatusCode -lt 400) { $LogoUrl = $candidate }
-      }
-      catch {
-        Write-Host ('Logo not available for ' + $domain + ': ' + $_) -ForegroundColor Yellow
-        $LogoUrl = ''
-      }
-    }
-    catch {
-      Write-Host "Failed to prepare logo token: $_" -ForegroundColor Yellow
-    }
+    $LogoToken = SecureStringToPlain $secureApiKey
+    $LogoUrl = "https://img.logo.dev/$($domain)?token=$($LogoToken)"
   }
 }
 catch {
@@ -87,7 +73,7 @@ $unlicensed = $assigned | Where-Object { -not $_.AssignedFriendlyNames -or $_.As
 
 $topSkus = $skus | Sort-Object @{Expression = { [int]($_.ConsumedUnits) }; Descending = $true } | Select-Object -First 10
 
-$generated = (Get-Date).ToString('MM-dd-yyyy HH:mm:ss')
+$generated = (Get-Date).ToString('MMMM dd, yyyy')
 
 # Process renewal data for summaries and enhanced table
 $today = (Get-Date).Date
@@ -241,36 +227,359 @@ if ($nextRenewal) {
 
 
 $css = @'
-body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial; background: #f4f7fb; color:#222; margin:0; padding:24px }
-.container { max-width:90vw; margin:0 auto }
-.footer { margin-top: 40px; border-top: 1px solid #eef2f7; padding-top: 20px; text-align: center; color: #6b7280; font-size: 12px; }
-.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px }
-.title { font-size:20px; font-weight:700 }
+/* Premium Modern Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.overview-card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #edf2f7; transition: transform 0.2s; position: relative; overflow: hidden; }
-.overview-card:hover { transform: translateY(-2px); }
-.overview-card .label { color: #718096; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-.overview-card .value { font-size: 1.6rem; font-weight: 700; color: #1a202c; line-height: 1.2; }
-.overview-card .sub-value { font-size: 0.85rem; color: #a0aec0; margin-top: 6px; }
-.overview-card .icon { position: absolute; right: 16px; top: 16px; font-size: 1.5rem; opacity: 0.15; }
+:root {
+  --bg-gradient-start: #0f0f23;
+  --bg-gradient-end: #1a1a3e;
+  --card-bg: rgba(255,255,255,0.03);
+  --card-border: rgba(255,255,255,0.08);
+  --card-hover: rgba(255,255,255,0.06);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --glass-blur: blur(20px);
+  --shadow-glow: 0 0 40px rgba(102,126,234,0.15);
+}
 
-.badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 700; margin-top: 8px; }
-.badge-renewal { background: #fffaf0; color: #9c4221; border: 1px solid #feebc8; }
-.badge-neutral { background: #f7fafc; color: #4a5568; border: 1px solid #edf2f7; }
+* { box-sizing: border-box; }
 
-.section { word-break: break-all; table-layout: fixed; margin-top:22px; background:#fff; border-radius:8px; padding:12px; box-shadow:0 1px 4px rgba(16,24,40,0.04) }
-table { width:100%; border-collapse:collapse; margin-top:8px }
-th, td { padding:8px 10px; text-align:left; border-bottom:1px solid #eef2f7; font-size:13px }
-th { background:#fbfdff; font-weight:600; position:relative; cursor:pointer; user-select:none }
-th:hover { background:#f0f7ff }
-th::after { content:'\2195'; position:absolute; right:8px; top:50%; transform:translateY(-50%); opacity:0.2; font-size:11px }
-th[data-order="asc"]::after { content:'\25B2'; opacity:0.8 }
-th[data-order="desc"]::after { content:'\25BC'; opacity:0.8 }
-.resizer { position:absolute; right:0; top:0; bottom:0; width:5px; cursor:col-resize; z-index:10 }
-.resizer:hover, .resizing { background:#cfe6ff }
-.small { color:#6b7280; font-size:12px }
-.muted { color:#6b7280 }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+  min-height: 100vh;
+  color: var(--text-primary);
+  margin: 0;
+  padding: 32px;
+  line-height: 1.6;
+}
+
+.container { max-width: 1400px; margin: 0 auto; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  padding: 24px 32px;
+  background: var(--card-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-glow);
+}
+
+.logo img.logo { 
+  max-height: 60px; 
+  margin-right: 20px;
+  border-radius: 12px;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.small { color: var(--text-secondary); font-size: 13px; font-weight: 500; }
+
+/* Navigation */
+.nav {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 32px 0;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  width: fit-content;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.nav button {
+  background: transparent;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav button span {
+  font-size: 16px;
+  opacity: 0.7;
+  transition: transform 0.3s ease;
+}
+
+.nav button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.nav button:hover span {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.nav button.active {
+  background: var(--accent-gradient);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.nav button.active span {
+  opacity: 1;
+}
+
+/* Overview Cards */
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.overview-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 24px 28px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.card-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overview-card:hover {
+  transform: translateY(-6px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 20px rgba(102, 126, 234, 0.2);
+}
+
+.overview-card .icon {
+  font-size: 1.8rem;
+  transition: transform 0.4s ease;
+  line-height: 1;
+}
+
+.overview-card:hover .icon {
+  transform: scale(1.2) rotate(5deg);
+}
+
+.overview-card .label {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0;
+}
+
+.overview-card .value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin-top: auto;
+  margin-bottom: 8px;
+  white-space: nowrap;
+}
+
+.overview-card .sub-value {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  height: 1.2rem; /* Fixed height for sub-value to ensure alignment */
+  margin: 0;
+}
+
+.overview-card .badge-inline {
+  display: inline-block;
+}
+  letter-spacing: 0.05em;
+}
+
+.badge-green { background: rgba(16,185,129,0.15); color: var(--accent-emerald); border: 1px solid rgba(16,185,129,0.3); }
+.badge-amber { background: rgba(245,158,11,0.15); color: var(--accent-amber); border: 1px solid rgba(245,158,11,0.3); }
+.badge-red { background: rgba(244,63,94,0.15); color: var(--accent-rose); border: 1px solid rgba(244,63,94,0.3); }
+.badge-neutral { background: rgba(148,163,184,0.1); color: var(--text-secondary); border: 1px solid rgba(148,163,184,0.2); }
+
+/* Sections & Tables */
+.section {
+  margin-top: 28px;
+  background: var(--card-bg);
+  backdrop-filter: var(--glass-blur);
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid var(--card-border);
+}
+
+.section h3, .section h4 {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin: 0 0 16px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+th, td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--card-border);
+  font-size: 13px;
+}
+
+th {
+  background: rgba(255,255,255,0.02);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+th:hover { background: rgba(255,255,255,0.04); }
+
+th::after {
+  content: '\2195';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.3;
+  font-size: 10px;
+}
+
+th[data-order="asc"]::after { content: '\25B2'; opacity: 0.8; color: var(--accent-blue); }
+th[data-order="desc"]::after { content: '\25BC'; opacity: 0.8; color: var(--accent-blue); }
+
+td { color: var(--text-primary); }
+
+tr:hover td { background: rgba(255,255,255,0.02); }
+
+tfoot tr { border-top: 2px solid var(--card-border); }
+tfoot td { font-weight: 700; color: var(--text-primary); }
+
+/* Search inputs */
+.table-search {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  width: 280px;
+  transition: all 0.2s ease;
+}
+
+.table-search:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+
+.table-search::placeholder { color: var(--text-muted); }
+
+/* Resizer */
+.resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  z-index: 10;
+}
+
+.resizer:hover, .resizing { background: var(--accent-blue); }
+
+/* Details/Summary */
+details { margin-top: 20px; }
+
+summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 12px 0;
+  transition: color 0.2s ease;
+}
+
+summary:hover { color: var(--text-primary); }
+
+summary h4 { display: inline; margin: 0; }
+
+/* Footer */
+.footer {
+  margin-top: 48px;
+  border-top: 1px solid var(--card-border);
+  padding-top: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.footer a { color: var(--accent-blue); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+
+/* Utilities */
+.muted { color: var(--text-muted); }
+
+/* Responsive */
+@media (max-width: 800px) {
+  body { padding: 16px; }
+  .header { flex-direction: column; align-items: flex-start; gap: 16px; padding: 20px; }
+  .nav { width: 100%; overflow-x: auto; }
+  .overview-grid { grid-template-columns: 1fr; }
+}
 '@
 
 function To-HtmlSafe($s) { if ($null -eq $s) { '' } else { [System.Net.WebUtility]::HtmlEncode([string]$s) } }
@@ -296,7 +605,7 @@ function Format-Date($d) {
   if ([string]::IsNullOrWhiteSpace($d)) { return '' }
   try {
     $dt = [datetime]$d
-    return $dt.ToString('MM-dd-yyyy')
+    return $dt.ToString('MMMM dd, yyyy')
   }
   catch {
     return $d
@@ -404,7 +713,7 @@ if ($renewalsParsed.Count -gt 0) {
     if ($rw.ParsedDate) { $daysUntil = ([int]([math]::Floor(($rw.ParsedDate - $today).TotalDays))) }
     if ($daysUntil -ne '') { $daysDisplay = $daysUntil -lt 0 ? ("Past: $([math]::Abs($daysUntil))d") : ("$daysUntil d") } else { $daysDisplay = '' }
     $dateDisplay = ''
-    if ($rw.ParsedDate) { $dateDisplay = $rw.ParsedDate.ToString('MM-dd-yyyy') }
+    if ($rw.ParsedDate) { $dateDisplay = $rw.ParsedDate.ToString('MMMM dd, yyyy') }
     
     $isPaid = $false
     # Check if SKU is paid
@@ -530,15 +839,7 @@ $html = @"
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>License Report</title>
-  <style>$css
-  /* Nav styles */
-  .nav { display:flex; gap:8px; margin:12px 0 18px 0 }
-  .nav button { background:transparent; border:1px solid transparent; padding:8px 12px; border-radius:6px; cursor:pointer }
-  .nav button.active { background:#eef6ff; border-color:#cfe6ff; font-weight:600 }
-  .logo img.logo { max-height:54px; margin-right:12px }
-  .header { display:flex; align-items:center; justify-content:space-between; gap:12px }
-  @media (max-width:800px) { .header { flex-direction:column; align-items:flex-start } }
-  </style>
+  <style>$css</style>
 </head>
 <body>
   <div class="container">
@@ -553,51 +854,78 @@ $html = @"
           <div class="small">$companyName</div>
         </div>
       </div>
-      <div class="small">Generated: $generated</div>
     </div>
 
     <div class="nav" role="navigation">
-      <button data-tab="overview" class="active">Overview</button>
-      <button data-tab="assignments">Assignments</button>
-      <button data-tab="licenses">Licenses</button>
-      <button data-tab="renewals">Renewals</button>
+      <button data-tab="overview" class="active"><span>📊</span> Overview</button>
+      <button data-tab="assignments"><span>👥</span> Assignments</button>
+      <button data-tab="licenses"><span>💳</span> Licenses</button>
+      <button data-tab="renewals"><span>🔄</span> Renewals</button>
     </div>
 
     <div id="overview" class="tab-content">
       <div class="overview-grid">
         <div class="overview-card">
-          <div class="icon">💰</div>
-          <div class="label">Est. Monthly Cost</div>
+          <div class="card-header">
+            <div class="card-label-group">
+              <div class="label">Est. Monthly Cost</div>
+            </div>
+            <div class="icon">💰</div>
+          </div>
           <div class="value">$displayMonthlyCost</div>
           <div class="sub-value">Based on active seats</div>
         </div>
 
         <div class="overview-card">
-          <div class="icon">📅</div>
-          <div class="label">Est. Annual Cost</div>
+          <div class="card-header">
+            <div class="card-label-group">
+              <div class="label">Est. Annual Cost</div>
+            </div>
+            <div class="icon">📅</div>
+          </div>
           <div class="value">`$$('{0:N2}' -f ($estMonthlyCost * 12))</div>
           <div class="sub-value">Projected next 12 months</div>
         </div>
 
         <div class="overview-card">
-          <div class="icon">👥</div>
-          <div class="label">Active Paid Users</div>
+          <div class="card-header">
+            <div class="card-label-group">
+              <div class="label">Active Paid Users</div>
+            </div>
+            <div class="icon">👥</div>
+          </div>
           <div class="value">$totalPaidUsersCount</div>
           <div class="sub-value">Users with paid licenses</div>
         </div>
 
         <div class="overview-card">
-          <div class="icon">🔔</div>
-          <div class="label">Next Paid Renewal</div>
-          <div class="value">$(if ($nextPaidRenewalDate) { $nextPaidRenewalDate.ToString('MM-dd-yyyy') } else { 'N/A' })</div>
-          <div class="sub-value">
-            $(if ($nextPaidRenewalDays -ne $null) {
-                $color = if ($nextPaidRenewalDays -le 30) { 'badge-red' } elseif ($nextPaidRenewalDays -le 90) { 'badge-amber' } else { 'badge-green' }
-                "<span class='badge $color'>In $nextPaidRenewalDays days</span>"
-            } else {
-                "<span class='badge badge-neutral'>No upcoming renewals</span>"
-            })
+          <div class="card-header">
+            <div class="card-label-group">
+              <div class="label">Next Paid Renewal</div>
+              <div class="badge-inline">
+                $(if ($nextPaidRenewalDays -ne $null) {
+                    $color = if ($nextPaidRenewalDays -le 30) { 'badge-red' } elseif ($nextPaidRenewalDays -le 90) { 'badge-amber' } else { 'badge-green' }
+                    "<span class='badge $color'>In $nextPaidRenewalDays days</span>"
+                } else {
+                    "<span class='badge badge-neutral'>No upcoming renewals</span>"
+                })
+              </div>
+            </div>
+            <div class="icon">🔔</div>
           </div>
+          <div class="value">$(if ($nextPaidRenewalDate) { $nextPaidRenewalDate.ToString('MMMM dd, yyyy') } else { 'N/A' })</div>
+          <div class="sub-value">Upcoming renewal date</div>
+        </div>
+
+        <div class="overview-card">
+          <div class="card-header">
+            <div class="card-label-group">
+              <div class="label">Report Generated</div>
+            </div>
+            <div class="icon">⚙️</div>
+          </div>
+          <div class="value">$generated</div>
+          <div class="sub-value">Data snapshot</div>
         </div>
       </div>
     </div>
