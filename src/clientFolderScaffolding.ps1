@@ -1,57 +1,83 @@
+<#
+.SYNOPSIS
+    Client folder selection and date-based folder creation
+
+.DESCRIPTION
+    Provides interactive menu for selecting existing client or creating new client folders.
+    Creates dated subfolder (YYYY-MM-DD) for organizing daily reports and maintaining history.
+    Sets global working path for report output.
+    
+.OUTPUTS
+    Sets $GlobalWorkingPath variable with the dated folder path
+    Example: Output\Clients\Contoso Ltd\2026-01-14
+#>
+
+# ============================================================================
+# HELPER FUNCTION: SELECT OR CREATE CLIENT FOLDER
+# ============================================================================
+# Interactive menu for client folder selection with new folder creation option
+
 function Select-Or-Create-Folder {
-    # --- Configuration ---
+
+    # ========================================================================
+    # Configuration: Root directory for client folders
+    # ========================================================================
     # Set the root directory where the folders are located
-    $RootDirectory = ".\Output\Clients" #
+    $RootDirectory = ".\Output\Clients"
 
     if (-not (Test-Path -Path $RootDirectory -PathType Container)) {
         Write-Host "Error: The specified root directory '$RootDirectory' does not exist." -ForegroundColor Red
         return
     }
 
-    # --- Step 1: Get Existing Folders ---
-    # FIX: Cast the result to [array] to ensure it is always treated as a collection, 
-    # even when only one folder is returned.
+    # ========================================================================
+    # Step 1: Retrieve all existing client folders
+    # ========================================================================
+    # Cast result to [array] to ensure proper collection handling even with single folder
     [array]$Folders = Get-ChildItem -Path $RootDirectory -Directory | Select-Object -ExpandProperty Name
     $FolderCount = $Folders.Count
 
-    # --- Step 2: Loop for Menu Display and Selection ---
+    # ========================================================================
+    # Step 2: Interactive Menu Loop
+    # ========================================================================
+    # Display menu options and get user selection
+    
     while ($true) {
         Write-Host ""
         Write-Host "====================================" -ForegroundColor Cyan
-        Write-Host "      Select a Project Folder       " -ForegroundColor Cyan
+        Write-Host "   Select Client or Create New   " -ForegroundColor Cyan
         Write-Host "====================================" -ForegroundColor Cyan
         Write-Host ""
         
-        # 1. List Existing Folders
+        # Display existing client folders
         for ($i = 0; $i -lt $FolderCount; $i++) {
             $Index = $i + 1
-            # The indexing here will now correctly grab the full folder name
-            Write-Host "  $Index) $($Folders[$i])" 
+            Write-Host "  [$Index] $($Folders[$i])" 
         }
 
-        # 2. Add 'Create New' Option
+        # Add 'Create New' option
         $CreateNewOption = $FolderCount + 1
         Write-Host "------------------------------------"
-        Write-Host "  $CreateNewOption) Create NEW Folder" -ForegroundColor Green
+        Write-Host "  [$CreateNewOption] Create NEW Client" -ForegroundColor Green
         Write-Host "------------------------------------"
         Write-Host ""
 
-        # --- Step 3: Get User Input with Dynamic Prompt ---
-        
+        # Get user input with dynamic prompt based on folder count
         if ($FolderCount -eq 0) {
-            # Case 1: Directory is empty (only option is 1)
-            $PromptText = "Enter '1' to create a new folder"
+            $PromptText = "Enter '1' to create a new client"
         } else {
-            # Case 2: Directory has folders (range is 1 to $CreateNewOption)
             $PromptText = "Enter the number of your choice (1-$CreateNewOption)"
         }
 
         [string]$Selection = Read-Host $PromptText
-        # --- Step 4: Validate and Process Input ---
         
-        # A. Create New Folder Option
+        # ====================================================================
+        # Process user selection
+        # ====================================================================
+        
+        # Option 1: Create New Client Folder
         if ($Selection -eq $CreateNewOption) {
-            [string]$NewFolderName = Read-Host "Enter the name for the new folder"
+            [string]$NewFolderName = Read-Host "Enter the name for the new client folder"
             $NewFolderPath = Join-Path -Path $RootDirectory -ChildPath $NewFolderName
 
             if (Test-Path -Path $NewFolderPath -PathType Container) {
@@ -60,7 +86,7 @@ function Select-Or-Create-Folder {
                 # Create the new folder
                 New-Item -Path $NewFolderPath -ItemType Directory | Out-Null
                 Write-Host ""
-                Write-Host "Successfully created new folder: '$NewFolderName'" -ForegroundColor Green
+                Write-Host "Successfully created new client folder: '$NewFolderName'" -ForegroundColor Green
                 
                 # Set the selected path and exit the loop
                 $SelectedPath = $NewFolderPath
@@ -68,32 +94,34 @@ function Select-Or-Create-Folder {
             }
         } 
         
-        # B. Select Existing Folder Option
+        # Option 2: Select Existing Client Folder
         elseif ($Selection -ge 1 -and $Selection -le $FolderCount) {
             $Index = [int]$Selection - 1
             $SelectedFolderName = $Folders[$Index]
             $SelectedPath = Join-Path -Path $RootDirectory -ChildPath $SelectedFolderName
             
             Write-Host ""
-            Write-Host "You selected folder: '$SelectedFolderName'" -ForegroundColor Yellow
-            break # Exit the loop after a valid selection
-        } 
+            Write-Host "Selected client: '$SelectedFolderName'" -ForegroundColor Green
+            break
+        }
         
-        # C. Invalid Input
+        # Option 3: Invalid input
         else {
             Write-Host "Invalid selection. Please enter a number between 1 and $CreateNewOption." -ForegroundColor Red
         }
     }
     
-    # --- Step 5: Return the Result ---
-    return $SelectedPath
-}
+    # Return the selected/created client path
 
 
 
+# ============================================================================
+# HELPER FUNCTION: GET FINAL WORKING PATH WITH DATE SUBFOLDER
+# ============================================================================
+# Creates dated subfolder (YYYY-MM-DD) for organizing daily reports
 
 function Get-Final-Working-Path {
-    # 1. Get the user-selected/created project folder path
+    # Step 1: Get the user-selected/created project folder path
     $ProjectFolderPath = Select-Or-Create-Folder
     
     if (-not $ProjectFolderPath) {
@@ -101,45 +129,40 @@ function Get-Final-Working-Path {
         return $null 
     }
     
-    # 2. Generate the date string for the new folder name
+    # Step 2: Generate the date string for the new subfolder
+    # Format: YYYY-MM-DD (allows sorting and easy date identification)
     $DateFolderName = Get-Date -Format "yyyy-MM-dd"
     $DateFolderPath = Join-Path -Path $ProjectFolderPath -ChildPath $DateFolderName
     
-    Write-Host "`nAttempting to create/update date subfolder: '$DateFolderName'" -ForegroundColor Yellow
+    Write-Host "`nCreating dated folder: '$DateFolderName'" -ForegroundColor Cyan
 
-    # 3. Create/Reuse the date folder using -Force
+    # Step 3: Create/Reuse the date folder
     try {
-        # -Force handles the overwrite/reuse requirement
+        # -Force handles both creation and reuse scenarios
         $NewFolder = New-Item -Path $DateFolderPath -ItemType Directory -Force 
         
-        Write-Host "Successfully ensured date folder exists at: $($NewFolder.FullName)" -ForegroundColor Green
+        Write-Host "Dated folder ready: $($NewFolder.FullName)" -ForegroundColor Green
         
-        # 4. Return the absolute final path
+        # Step 4: Return the absolute final path
         return $NewFolder.FullName
         
     } catch {
-        Write-Host "Error creating date subfolder: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "Error creating dated folder: $($_.Exception.Message)" -ForegroundColor Red
         return $null
     }
 }
 
-
-# ====================================================================
-# SCRIPT EXECUTION
-# ====================================================================
-
+# ============================================================================
+# SCRIPT EXECUTION: Initialize Global Working Path
+# ============================================================================
 # Capture the output of the function into a variable in the main session
 $GlobalWorkingPath = Get-Final-Working-Path
 
 if ($GlobalWorkingPath) {
     Write-Host "`n=======================================================" -ForegroundColor Magenta
-    Write-Host "SUCCESS: Your final working path is:" -ForegroundColor Magenta
-    Write-Host "$GlobalWorkingPath" -ForegroundColor Magenta
+    Write-Host "SUCCESS: Working path established:" -ForegroundColor Magenta
+    Write-Host "$GlobalWorkingPath" -ForegroundColor Green
     Write-Host "=======================================================" -ForegroundColor Magenta
-    
-    # Example usage: You can now use $GlobalWorkingPath anywhere else in your script
-    # Set-Location -Path $GlobalWorkingPath
-    # Copy-Item -Path "C:\Source\File.txt" -Destination $GlobalWorkingPath
 } else {
-    Write-Host "`nScript terminated or failed to set a final working path." -ForegroundColor Red
+    Write-Host "`nError: Failed to establish working path" -ForegroundColor Red
 }

@@ -1,10 +1,39 @@
+<#
+.SYNOPSIS
+    Retrieves subscription renewal dates and license metadata
+
+.DESCRIPTION
+    Queries Microsoft 365 subscription information to extract:
+    - SKU renewal/lifecycle dates
+    - Commerce and subscription IDs
+    - Trial vs. paid status
+    - Subscription status and license counts
+    - Days until renewal with status warnings
+    
+    Enriches data with SKU-friendly names from pricing data.
+    Creates: LicenseRenewalData.csv
+
+.PARAMETER GlobalWorkingPath
+    Output directory for the renewal data CSV
+
+.OUTPUTS
+    LicenseRenewalData.csv - One row per active SKU with renewal info
+
+.NOTES
+    Uses /directory/subscriptions endpoint (Microsoft Graph)
+    Handles duplicate SKU IDs with warnings
+    Matches against pricing.csv for display names
+#>
+
 param(
     [Parameter(Mandatory = $true)]
     [string]$GlobalWorkingPath
 )
 
-# Fetch license SKUs
-[array]$Skus = Get-MgSubscribedSku
+# ============================================================================
+# FETCH SUBSCRIPTION SKU DATA
+# ============================================================================
+# Query Get-MgSubscribedSku for current license consumption data
 $SkuReport = [System.Collections.Generic.List[Object]]::new()
 
 foreach ($Sku in $Skus) {

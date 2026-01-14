@@ -24,6 +24,7 @@ function SecureStringToPlain([System.Security.SecureString]$ss) {
 
 # Determine domain from signed-in Microsoft Graph user (prefer authoritative tenant info)
 $domain = $null
+$LogoUrl = ''
 try {
   $me = (Get-MgContext).Account
   $domain = $me.Split('@')[-1].ToLower()
@@ -33,7 +34,6 @@ try {
       $domain = $org.DefaultDomain.ToLower()
     }
   }
-  $LogoUrl = ''
   # Only attempt to fetch logo for domains that are not the default onmicrosoft domain
   $secureApiKey = Get-Secret -Name 'LogoApiKey' -ErrorAction SilentlyContinue
   if ($secureApiKey) {
@@ -43,6 +43,22 @@ try {
 }
 catch {
   Write-Host "Failed to determine domain from Microsoft Graph context: $_" -ForegroundColor Yellow
+}
+
+# Load stored logo URL if it exists, otherwise use the auto-generated one
+# Calculate script root and client root from the working path
+# Structure: [ScriptRoot]\Output\Clients\[ClientName]\[Date]
+$ClientRoot = Split-Path -Path $GlobalWorkingPath -Parent
+$ScriptRoot = Split-Path -Path $ClientRoot -Parent
+$ScriptRoot = Split-Path -Path $ScriptRoot -Parent
+$ScriptRoot = Split-Path -Path $ScriptRoot -Parent
+
+$LogoUrlPath = Join-Path -Path $ClientRoot -ChildPath 'LogoUrl.txt'
+if (Test-Path -Path $LogoUrlPath) {
+  $storedLogoUrl = Get-Content -Path $LogoUrlPath -Raw -ErrorAction SilentlyContinue
+  if ($storedLogoUrl -and $storedLogoUrl.Trim()) {
+    $LogoUrl = $storedLogoUrl.Trim()
+  }
 }
 
 $skus = Safe-ImportCsv -path $SubscribedCsvPath
@@ -276,11 +292,15 @@ body {
   box-shadow: var(--shadow-glow);
 }
 
-.logo img.logo { 
-  max-height: 60px; 
-  margin-right: 20px;
-  border-radius: 12px;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+.logo-container img.logo { 
+  max-height: 32px;
+  max-width: 96px;
+  width: auto;
+  height: auto;
+  margin-right: 12px;
+  border-radius: 8px;
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.22));
+  object-fit: contain;
 }
 
 .title {
@@ -572,12 +592,182 @@ summary h4 { display: inline; margin: 0; }
 /* Utilities */
 .muted { color: var(--text-muted); }
 
+/* Logo Editor */
+.logo-container {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.logo-container:hover .logo-edit-hint {
+  opacity: 1;
+}
+
+.logo-edit-hint {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--accent-blue);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  white-space: nowrap;
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  animation: fadeIn 0.3s ease;
+}
+
+.modal.show {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background: var(--card-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--card-border);
+  padding: 32px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  max-width: 500px;
+  width: 90%;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+.modal-body {
+  margin-bottom: 24px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}
+
+.logo-preview {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px;
+  text-align: center;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-preview img {
+  max-height: 80px;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-primary, .btn-secondary {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.btn-primary {
+  background: var(--accent-gradient);
+  color: white;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--card-border);
+}
+
+.btn-secondary:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--card-border);
+}
+
 /* Responsive */
 @media (max-width: 800px) {
   body { padding: 16px; }
   .header { flex-direction: column; align-items: flex-start; gap: 16px; padding: 20px; }
   .nav { width: 100%; overflow-x: auto; }
   .overview-grid { grid-template-columns: 1fr; }
+  .modal-content { max-width: calc(100% - 32px); }
 }
 '@
 
@@ -604,7 +794,7 @@ function Format-Date($d) {
   if ([string]::IsNullOrWhiteSpace($d)) { return '' }
   try {
     $dt = [datetime]$d
-    return $dt.ToString('MM,dd, yyyy') 
+    return $dt.ToString('MM-dd-yyyy') 
   }
   catch {
     return $d
@@ -840,13 +1030,14 @@ $html = @"
   <title>License Report</title>
   <style>$css</style>
 </head>
-<body>
+<body data-client-root="$($ClientRoot -replace '\\', '/')" data-script-root="$($ScriptRoot -replace '\\', '/')" data-company="$(To-HtmlSafe $companyName)">
   <div class="container">
     <div class="header">
       <div style="display:flex;align-items:center">
-        <div class="logo">
+        <div class="logo-container" id="logoContainer" $(if ($LogoUrl) { 'title="Click to edit logo"' } else { '' })>
           <!-- logo omitted if $LogoUrl is empty -->
-          <img src="$LogoUrl" alt="$companyName Logo" class="logo" style="display:$(if ($LogoUrl) { 'inline-block' } else { 'none' })">
+          <img id="logoImg" src="$LogoUrl" alt="$companyName Logo" class="logo" style="display:$(if ($LogoUrl) { 'inline-block' } else { 'none' })">
+          $(if ($LogoUrl) { '<span class="logo-edit-hint">Click to edit</span>' } else { '' })
         </div>
         <div>
           <div class="title">Microsoft 365 License Report</div>
@@ -992,6 +1183,33 @@ $html = @"
     </div>
   </div>
 
+  <!-- Logo Editor Modal -->
+  <div id="logoModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Edit Logo</div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="logoUrlInput">Logo URL</label>
+          <input type="text" id="logoUrlInput" placeholder="https://example.com/logo.png">
+        </div>
+        <div class="logo-preview">
+          <img id="logoPreviewImg" style="display:none; max-height:80px; max-width:100%; width:auto; height:auto; object-fit:contain;">
+        </div>
+        <div id="saveSuccessSection" style="display:none; margin-top:20px; padding:16px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:8px;">
+          <div style="color:#10b981; font-weight:600; margin-bottom:12px;">✓ Logo Updated!</div>
+          <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">To save this logo for future reports, run this command in PowerShell:</div>
+          <div style="background:rgba(0,0,0,0.3); padding:12px; border-radius:6px; font-family:monospace; font-size:12px; word-break:break-all; line-height:1.4; margin-bottom:12px; color:var(--text-primary);" id="psCommandDisplay"></div>
+          <button id="copyCommandBtn" class="btn-primary" style="width:100%; margin-bottom:8px;">📋 Copy Command</button>
+          <div style="font-size:12px; color:var(--text-muted);">Command copied to clipboard!</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="closeModal">Close</button>
+        <button class="btn-primary" id="saveLogo">Save Logo</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     function showTab(name) {
       document.querySelectorAll('.tab-content').forEach(function(el){ el.style.display = 'none' })
@@ -1095,6 +1313,114 @@ $html = @"
       // initialize searches
       document.querySelectorAll('.table-search').forEach(function(inp){ attachSearch(inp) })
     })
+
+    // Logo Editor Modal
+    var logoModal = document.getElementById('logoModal')
+    var logoContainer = document.getElementById('logoContainer')
+    var logoImg = document.getElementById('logoImg')
+    var closeModal = document.getElementById('closeModal')
+    var logoUrlInput = document.getElementById('logoUrlInput')
+    var saveLogo = document.getElementById('saveLogo')
+    var logoPreviewImg = document.getElementById('logoPreviewImg')
+    var saveSuccessSection = document.getElementById('saveSuccessSection')
+    var psCommandDisplay = document.getElementById('psCommandDisplay')
+    var copyCommandBtn = document.getElementById('copyCommandBtn')
+    var clientRoot = document.body.getAttribute('data-client-root')
+    var scriptRoot = document.body.getAttribute('data-script-root')
+    var company = document.body.getAttribute('data-company')
+
+    if (logoContainer && logoImg.src) {
+      logoContainer.addEventListener('click', function(e) {
+        logoUrlInput.value = logoImg.src
+        logoPreviewImg.src = logoImg.src
+        logoPreviewImg.style.display = logoImg.src ? 'block' : 'none'
+        saveSuccessSection.style.display = 'none'
+        logoModal.classList.add('show')
+      })
+    }
+
+    if (closeModal) {
+      closeModal.addEventListener('click', function() {
+        logoModal.classList.remove('show')
+      })
+    }
+
+    if (logoModal) {
+      logoModal.addEventListener('click', function(e) {
+        if (e.target === logoModal) {
+          logoModal.classList.remove('show')
+        }
+      })
+    }
+
+    if (logoUrlInput) {
+      logoUrlInput.addEventListener('input', function() {
+        var url = this.value.trim()
+        if (url) {
+          logoPreviewImg.src = url
+          logoPreviewImg.style.display = 'block'
+          logoPreviewImg.onerror = function() {
+            logoPreviewImg.style.display = 'none'
+          }
+        } else {
+          logoPreviewImg.style.display = 'none'
+        }
+      })
+    }
+
+    if (saveLogo) {
+      saveLogo.addEventListener('click', function() {
+        var url = logoUrlInput.value.trim()
+        if (!url) {
+          alert('Please enter a valid logo URL')
+          return
+        }
+        
+        // Update the logo image immediately
+        logoImg.src = url
+        logoImg.style.display = 'inline-block'
+        
+        // Build the PowerShell command with clean paths
+        var scriptRootFormatted = scriptRoot.replace(/\//g, '\\')
+        var clientRootFormatted = clientRoot.replace(/\//g, '\\')
+        var updateScriptPath = scriptRootFormatted + '\\src\\updateLogoUrl.ps1'
+        var psCommand = '& "' + updateScriptPath + '" -ClientRoot "' + clientRootFormatted + '" -LogoUrl "' + url + '"'
+        
+        // Display the command in the modal
+        psCommandDisplay.textContent = psCommand
+        saveSuccessSection.style.display = 'block'
+        
+        // Hide the input and preview when showing success
+        document.querySelector('.form-group').style.display = 'none'
+        document.querySelector('.logo-preview').style.display = 'none'
+        
+        // Update save button state
+        saveLogo.style.display = 'none'
+        closeModal.textContent = 'Done'
+        
+        // Copy to clipboard functionality
+        if (copyCommandBtn) {
+          copyCommandBtn.onclick = function() {
+            var textarea = document.createElement('textarea')
+            textarea.value = psCommand
+            document.body.appendChild(textarea)
+            textarea.select()
+            document.execCommand('copy')
+            document.body.removeChild(textarea)
+            
+            // Show feedback
+            var originalText = copyCommandBtn.textContent
+            copyCommandBtn.textContent = '✓ Copied to clipboard!'
+            copyCommandBtn.style.opacity = '0.7'
+            
+            setTimeout(function() {
+              copyCommandBtn.textContent = originalText
+              copyCommandBtn.style.opacity = '1'
+            }, 2000)
+          }
+        }
+      })
+    }
   </script>
 
 </body>

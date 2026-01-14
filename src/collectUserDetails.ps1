@@ -1,5 +1,30 @@
 # =========================================================
-# collectUserDetails.ps1
+# collectUserDetails.ps1 - User Profile and License Collection
+# =========================================================
+#
+# SYNOPSIS
+#   Collects comprehensive user and license data from Microsoft Graph
+#
+# DESCRIPTION
+#   Queries all tenant users with their:
+#   - Basic profile information (name, department, job title)
+#   - License assignments and SKU details
+#   - Sign-in activity (if available)
+#   - Account status and creation dates
+#
+#   Creates: user_details.csv in the output folder
+#
+# PARAMETERS
+#   GlobalWorkingPath (required) - Output directory for CSV files
+#
+# OUTPUT FILES
+#   user_details.csv - One row per user with all details
+#
+# NOTES
+#   - SignInActivity requires AuditLog.Read.All scope
+#   - If SignInActivity unavailable, falls back to "Unknown"
+#   - Handles both direct and group-based license assignments
+#   - Uses custom SKU friendly names from data/ directory
 # =========================================================
 
 param(
@@ -7,7 +32,7 @@ param(
     [string]$GlobalWorkingPath
 )
 
-Write-Host "--- Collecting User Profile Details from Graph ---" -ForegroundColor Cyan
+Write-Host "--- Collecting User Profile and License Details ---" -ForegroundColor Cyan
 Write-Host "Output directory: $GlobalWorkingPath" -ForegroundColor Yellow
 
 # Define the output file name
