@@ -36,6 +36,14 @@ param(
 # Query Get-MgSubscribedSku for current license consumption data
 $SkuReport = [System.Collections.Generic.List[Object]]::new()
 
+try {
+    [array]$Skus = Get-MgSubscribedSku -ErrorAction Stop
+}
+catch {
+    Write-Error "Failed to retrieve subscribed SKUs from Graph: $_"
+    return
+}
+
 foreach ($Sku in $Skus) {
     $DataLine = [PSCustomObject][Ordered]@{
         SkuPartNumber = $Sku.SkuPartNumber

@@ -37,9 +37,8 @@ if ($null -eq $mgContext ) {
     Write-Host "  - Access to the target Microsoft 365 tenant`n" -ForegroundColor Yellow
     
     # Connect with all required scopes
-    Connect-MgGraph -NoWelcome -Scopes "User.Read.All", "Group.Read.All", "Directory.Read.All", "Reports.Read.All", "AuditLog.Read.All", "Organization.Read.All"
+    Connect-MgGraph -NoWelcome -ContextScope Process -Scopes "User.Read.All", "Group.Read.All", "Directory.Read.All", "Reports.Read.All", "AuditLog.Read.All", "Organization.Read.All"
     
-    Write-Host "`nSuccessfully connected to Microsoft Graph" -ForegroundColor Green
     Write-Host "`nSuccessfully connected to Microsoft Graph" -ForegroundColor Green
     Write-Host "Logged in as: $((Get-MgContext).Account)" -ForegroundColor Cyan
 }
@@ -61,7 +60,7 @@ else {
             # Disconnect and reconnect
             Write-Host "`nDisconnecting and reconnecting to Microsoft Graph..." -ForegroundColor Yellow
             Disconnect-MgGraph | Out-Null
-            Connect-MgGraph -NoWelcome -Scopes "User.Read.All", "Group.Read.All", "Directory.Read.All", "Reports.Read.All", "AuditLog.Read.All", "Organization.Read.All"
+            Connect-MgGraph -NoWelcome -ContextScope Process -Scopes "User.Read.All", "Group.Read.All", "Directory.Read.All", "Reports.Read.All", "AuditLog.Read.All", "Organization.Read.All"
             Write-Host "`nSuccessfully reconnected as: $((Get-MgContext).Account)" -ForegroundColor Green
             break
         }

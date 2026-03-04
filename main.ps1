@@ -165,13 +165,7 @@ else {
     # Includes both direct and group-based assignments
     # Output: AssignedLicenses.csv, AssignedLicenses_Summary.csv
     . ".\src\createAssignedLicenses.ps1" -GlobalWorkingPath $GlobalWorkingPath
-}
 
-    # Step 6: Create normalized license assignment report
-    # One row per user with all assigned licenses
-    # Includes both direct and group-based assignments
-    # Output: AssignedLicenses.csv, AssignedLicenses_Summary.csv
-    . ".\src\createAssignedLicenses.ps1" -GlobalWorkingPath $GlobalWorkingPath
 }
 
 # ============================================================================

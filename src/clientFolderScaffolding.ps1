@@ -69,7 +69,7 @@ function Select-Or-Create-Folder {
             $PromptText = "Enter the number of your choice (1-$CreateNewOption)"
         }
 
-        [string]$Selection = Read-Host $PromptText
+        [int]$Selection = [int](Read-Host $PromptText)
         
         # ====================================================================
         # Process user selection
@@ -112,8 +112,8 @@ function Select-Or-Create-Folder {
     }
     
     # Return the selected/created client path
-
-
+    return $SelectedPath
+}
 
 # ============================================================================
 # HELPER FUNCTION: GET FINAL WORKING PATH WITH DATE SUBFOLDER
@@ -166,3 +166,4 @@ if ($GlobalWorkingPath) {
 } else {
     Write-Host "`nError: Failed to establish working path" -ForegroundColor Red
 }
+
